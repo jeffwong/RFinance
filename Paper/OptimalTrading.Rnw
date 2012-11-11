@@ -1,0 +1,162 @@
+\documentclass{article}
+
+\title{Optimal Trading\\BT Backtesting Engine}
+\author{Jeffrey Wong}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+<<echo=F>>=
+require(OptimalTrading)
+require(RFinance)
+@
+
+\section{Summary}
+
+This R package represents a backtesting engine for Belvedere Trading.  The 
+objective is to take a dataset of the market for $n$ different assets over
+a period of $T$ days (or any time interval), and use historic prices to determine
+what the optimal trading strategy would have been over the past $T$ periods.  
+Furthermore, we would like to use data mining techniques to extract any patterns 
+from the optimal strategy.  Note: backtesting does not necessarily provide any 
+predictive power; it is for us to benchmark our own trading strategies with what 
+was best.
+
+\section{Optimization}
+
+In determining the optimal strategy, there are two things we may want to
+consider.  In one, we consider pure profit maximization - here, OptimalTrading
+will identify the best times to buy and sell the assets.  This is not necessarily
+the trivial rule of \textit{buy low, sell high}, as we want to make sure that
+funds are not tied up when a good opportunity to buy/sell an asset comes up.
+In two, we consider a utility function of profits and risks.  Here, we optimize
+to have maximal profits, but also take penalties from any risks we are exposed to.
+
+\subsection{Profit Maximization}
+
+We formulate this problem as a linear program:
+
+$$\min {\mathrm{prices}^T \mathrm{quantity}}$$
+
+subject to:
+
+\begin{itemize}
+  \item The amount of liquid funds available at any given time must be greater
+    than or equal to 0
+  \item The trader cannot short sell an asset
+\end{itemize}
+
+Let \textbf{cost} be a vector representing how much money was spent on each
+transaction.  This vector is equal to $-\mathrm{prices} \cdot \mathrm{quantity}$.  The running
+sum of this vector is equal to the total amount of money spent as of time $t$.  
+
+Likewise, the other constraint can be formulated by considering the running
+sum of the quantity vector.  However, this vector contains a mixture of assets,
+so we will want to reshape this into a matrix and apply the running sum over each
+column.
+
+\subsection{Utility Maximization}
+
+We formulate this problem as a quadratic program:
+
+$$\min {\mathrm{prices}^T \mathrm{quantity} + \frac{1}{2} \mathrm{quantity}^T Q \mathrm{quantity}}$$
+
+subject to:
+
+\begin{itemize}
+  \item The amount of liquid funds available at any given time must be greater
+    than or equal to 0
+  \item The trader cannot short sell an asset
+  \item The amount of risk for any particular asset the trader is exposed to 
+    should never exceed \textit{riskTol}
+\end{itemize}
+
+The utility function is quadratic in the decision variables so to prevent 
+buying large quantities of one particular asset.  Q is a diagonal matrix 
+containing the risks associated with each transaction.  If Q is positive
+definite, then the solution exists and is unique.  If Q is only semi-positive
+definite then a solution exists but is not necessarily unique.  If the risks
+vector is positive, then Q will be positive definite.  
+
+The risk constraint can be formulated like the previous two, where we compute a
+running sum per asset and enforce that this is less than or equal to riskTol.
+
+\section{Application}
+
+Here we will demonstrate the use of OptimalTrading.
+
+First we initialize some parameters and then choose the assets to download 
+market data on.
+
+<<>>=
+ndays = 10
+initFunds = 10^7
+Symbols = c("GOOG", "AAPL", "NFLX", "AMZN", "V", "BA", "JPM", "MSFT",
+  "SPY", "RHT", "BBBY", "CSCO", "BAC")
+market = getHistoricData(Symbols, ndays=ndays, return.type="df", mergeAll=T)
+head(market)
+@
+
+where the function getHistoricData comes from the package \textit{RFinance}.
+
+Now we will extract the prices vector from the market data, and pass it to 
+OptimalTrades.  The largest value of profits is returned, as well as the decisions
+that we need to make to obtain that.
+
+<<>>=
+opt <- OptimalTrades(market$Close, initFunds=initFunds, numAssets=length(Symbols))
+opt$profits
+opt$decisions
+@
+
+The decisions vector can be long and hard to read.  We need a way to visualize this.
+
+<<fig=T>>=
+(OptimalTrades.Decisions.plot(opt$decisions, length(Symbols), Symbols))
+@
+
+This is a heatmap of the decisions vector, which is transformed into a decisions 
+\textit{matrix} first.  The values in the decisions vector are binned into 5
+categories, 2 if buying a large quantity, 1 if buying a small quantity, 0 if no 
+trade was made, -1 if selling a small quantity, -2 if selling a large quantity.
+The image of the matrix is then plotted.
+
+But of course, we are risk averse people.  We will generate some random data to
+represent the risks for each transaction.
+
+<<>>=
+set.seed(100)
+n = length(market$Close)
+risks = abs(rnorm(n))
+riskTol = initFunds
+@
+
+By specifying a risks vector and riskTol scalar, OptimalTrades will switch
+the objective function and use quadratic programming.
+
+<<>>=
+opt <- OptimalTrades(market$Close, risks, riskTol, initFunds, length(Symbols))
+opt$profits
+@
+
+Visualizing the decisions, we will see that the trades are much more diversified.
+
+<<fig=T>>=
+(OptimalTrades.Decisions.plot(opt$decisions, length(Symbols), Symbols))
+@
+
+From this strategy, we would like to see if there are any patterns to what
+should be bought together and what should be sold together.  We can run
+association rules analysis using the apriori algorithm from the \textit{arules}
+package.
+
+<<>>=
+rules = OptimalTrades.Decisions.FindAssociations(opt$decisions, length(Symbols), 
+  Symbols, parameter=list(supp=0.5, conf=0.9, target="rules"))
+inspect(rules$buy.rules)
+inspect(rules$sell.rules)
+@
+
+\end{document}

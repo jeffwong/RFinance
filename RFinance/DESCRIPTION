@@ -1,0 +1,17 @@
+Package: RFinance
+Type: Package
+Title: RFinance
+Version: 1.0
+Date: 2011-06-25
+Author: Jeffrey Wong
+Maintainer: <jeff.ct.wong@stanford.edu>
+Description: Provides tools to analyze stock and option data.  Connects to Yahoo 
+  Finance API and downloads both historic data and real time quotes.  Price options 
+  using Black Scholes, determine implied volatility, and calculate the 5 greeks.  
+  Determine all risks associated with a particular portfolio.  Back-test trading 
+  strategies.  Find the optimal trading strategy with limited funds.  
+  Compute the minimum variance portfolio.  Maintain a virtual portfolio and 
+  calculate its value in real time.  
+License: GPL
+Depends: quantmod, RSQLite, XML, OptimalTrading
+LazyLoad: yes

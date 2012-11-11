@@ -1,0 +1,15 @@
+Package: OptimalTrading
+Type: Package
+Title: Convex optimization to determine optimal trading strategy using historical
+ prices
+Version: 1.0
+Date: 2011-06-22
+Author: Jeffrey Wong
+Maintainer: <jeff.ct.wong@stanford.edu>
+Description: Based on historical prices, backtest and find what the optimal
+  trading strategy would have been.  Benchmark your own trading strategy
+  with the optimal one.  Use association analysis to find any rules among a
+  trading strategy
+License: Private license, contact jeff.ct.wong@stanford.edu for permissions
+LazyLoad: yes
+Depends: arules, lpSolve, lpSolveAPI, Heatplus, quadprog
